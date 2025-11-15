@@ -16,6 +16,41 @@ from modules.visualizer import plot_time_series, plot_bar_chart, format_paramete
 # Carrega variáveis de ambiente do arquivo .env
 load_dotenv()
 
+def get_api_key_from_streamlit():
+    """
+    Obtém a chave de API do Streamlit Cloud secrets ou variável de ambiente.
+    Prioriza secrets do Streamlit Cloud.
+    """
+    api_key = None
+    
+    # Tenta obter dos secrets do Streamlit Cloud primeiro
+    try:
+        if hasattr(st, 'secrets'):
+            # No Streamlit Cloud, os secrets são acessados via st.secrets
+            # Pode ser um dict ou um objeto com atributos
+            try:
+                # Tenta acessar como atributo (formato mais comum no Streamlit Cloud)
+                api_key = st.secrets.OPENAQ_API_KEY
+            except (AttributeError, KeyError):
+                try:
+                    # Tenta acessar como dict
+                    if isinstance(st.secrets, dict):
+                        api_key = st.secrets.get('OPENAQ_API_KEY')
+                    else:
+                        api_key = st.secrets['OPENAQ_API_KEY']
+                except (KeyError, TypeError):
+                    # Tenta via get se disponível
+                    if hasattr(st.secrets, 'get'):
+                        api_key = st.secrets.get('OPENAQ_API_KEY')
+    except Exception:
+        pass
+    
+    # Se não encontrou nos secrets, tenta variável de ambiente
+    if not api_key:
+        api_key = get_api_key()
+    
+    return api_key
+
 # Cache para a lista de cidades (evita recarregar toda vez)
 @st.cache_data(ttl=3600)  # Cache por 1 hora
 def get_cached_cities(api_key):
@@ -38,16 +73,8 @@ st.markdown("---")
 with st.sidebar:
     st.header("⚙️ Configurações")
     
-    # Obtém a chave de API (tenta variável de ambiente ou secrets do Streamlit)
-    api_key = get_api_key()
-    
-    # Se não encontrou, tenta obter dos secrets do Streamlit Cloud
-    if not api_key:
-        try:
-            if hasattr(st, 'secrets') and 'OPENAQ_API_KEY' in st.secrets:
-                api_key = st.secrets['OPENAQ_API_KEY']
-        except:
-            pass
+    # Obtém a chave de API (prioriza secrets do Streamlit Cloud, depois variável de ambiente)
+    api_key = get_api_key_from_streamlit()
     
     # Busca cidades disponíveis na API
     st.subheader("Selecione a Cidade")
@@ -102,6 +129,10 @@ with st.sidebar:
 
 # Área principal do aplicativo
 if selected_city:
+    # Verifica novamente a chave de API (pode ter mudado)
+    if not api_key:
+        api_key = get_api_key_from_streamlit()
+    
     # Verifica se a chave de API está configurada
     if not api_key:
         st.error("❌ Chave de API não configurada!")

@@ -38,7 +38,13 @@ O Streamlit Cloud é a forma mais fácil de fazer deploy de aplicativos Streamli
      [secrets]
      OPENAQ_API_KEY = "3125f0d41afec0ee8b1871165638fa7352734cd8e2afe085f54a446d7092f864"
      ```
-   - **Importante:** O Streamlit Cloud requer formato TOML válido com `[secrets]` e aspas duplas
+   - **Importante:** 
+     - O Streamlit Cloud requer formato TOML válido
+     - Use `[secrets]` na primeira linha
+     - Use aspas duplas ao redor do valor
+     - Não use espaços antes ou depois do `=`
+     - Após salvar, aguarde 1-2 minutos para as mudanças propagarem
+     - Recarregue a página do app após salvar
 
 5. **Deploy:**
    - Clique em "Deploy"
