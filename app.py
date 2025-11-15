@@ -28,28 +28,33 @@ def get_api_key_from_streamlit():
     try:
         if hasattr(st, 'secrets'):
             debug_info.append("st.secrets existe")
-            # No Streamlit Cloud, os secrets são acessados via st.secrets
-            # Pode ser um dict ou um objeto com atributos
-            try:
-                # Tenta acessar como atributo (formato mais comum no Streamlit Cloud)
-                api_key = st.secrets.OPENAQ_API_KEY
-                debug_info.append("Acessado via st.secrets.OPENAQ_API_KEY")
-            except (AttributeError, KeyError) as e:
-                debug_info.append(f"Erro ao acessar como atributo: {type(e).__name__}")
+            
+            # O objeto Secrets tem métodos: get, has_key, keys, etc.
+            # Primeiro verifica se a chave existe
+            if hasattr(st.secrets, 'has_key') and st.secrets.has_key('OPENAQ_API_KEY'):
+                debug_info.append("Chave encontrada via has_key")
+                api_key = st.secrets.get('OPENAQ_API_KEY')
+                debug_info.append("Acessado via st.secrets.get()")
+            elif hasattr(st.secrets, 'get'):
+                # Tenta usar get diretamente (pode retornar None se não existir)
+                api_key = st.secrets.get('OPENAQ_API_KEY')
+                if api_key:
+                    debug_info.append("Acessado via st.secrets.get() (sucesso)")
+                else:
+                    debug_info.append("st.secrets.get() retornou None")
+            else:
+                # Tenta acessar como atributo
                 try:
-                    # Tenta acessar como dict
-                    if isinstance(st.secrets, dict):
-                        api_key = st.secrets.get('OPENAQ_API_KEY')
-                        debug_info.append("Acessado via st.secrets.get()")
-                    else:
+                    api_key = st.secrets.OPENAQ_API_KEY
+                    debug_info.append("Acessado via st.secrets.OPENAQ_API_KEY")
+                except AttributeError:
+                    debug_info.append("Erro ao acessar como atributo")
+                    # Tenta como dict
+                    try:
                         api_key = st.secrets['OPENAQ_API_KEY']
                         debug_info.append("Acessado via st.secrets['OPENAQ_API_KEY']")
-                except (KeyError, TypeError) as e:
-                    debug_info.append(f"Erro ao acessar como dict: {type(e).__name__}")
-                    # Tenta via get se disponível
-                    if hasattr(st.secrets, 'get'):
-                        api_key = st.secrets.get('OPENAQ_API_KEY')
-                        debug_info.append("Acessado via st.secrets.get() (fallback)")
+                    except (KeyError, TypeError):
+                        debug_info.append("Erro ao acessar como dict")
         else:
             debug_info.append("st.secrets NÃO existe")
     except Exception as e:
@@ -72,12 +77,16 @@ def get_api_key_from_streamlit():
         # Tenta listar todos os secrets disponíveis para debug
         try:
             if hasattr(st, 'secrets'):
-                if isinstance(st.secrets, dict):
+                if hasattr(st.secrets, 'keys'):
+                    try:
+                        keys_list = list(st.secrets.keys())
+                        print(f"Secrets disponíveis: {keys_list}")
+                    except:
+                        print("Não foi possível listar as chaves dos secrets")
+                elif isinstance(st.secrets, dict):
                     print(f"Secrets disponíveis (dict): {list(st.secrets.keys())}")
-                else:
-                    print(f"Secrets disponíveis (objeto): {dir(st.secrets)}")
-        except:
-            pass
+        except Exception as e:
+            print(f"Erro ao listar secrets: {str(e)}")
     
     return api_key
 
@@ -177,13 +186,34 @@ with st.sidebar:
             try:
                 if hasattr(st, 'secrets'):
                     st.write("✅ `st.secrets` está disponível")
+                    st.write(f"Tipo: {type(st.secrets)}")
+                    
+                    # Tenta listar as chaves disponíveis
                     try:
-                        if isinstance(st.secrets, dict):
+                        if hasattr(st.secrets, 'keys'):
+                            keys_list = list(st.secrets.keys())
+                            st.write(f"**Chaves disponíveis:** {keys_list}")
+                            
+                            # Verifica especificamente se OPENAQ_API_KEY existe
+                            if hasattr(st.secrets, 'has_key'):
+                                has_key = st.secrets.has_key('OPENAQ_API_KEY')
+                                st.write(f"**OPENAQ_API_KEY existe?** {'✅ Sim' if has_key else '❌ Não'}")
+                            
+                            # Tenta obter o valor
+                            if 'OPENAQ_API_KEY' in keys_list:
+                                try:
+                                    key_value = st.secrets.get('OPENAQ_API_KEY')
+                                    if key_value:
+                                        st.write(f"**Valor encontrado:** {key_value[:10]}... (primeiros 10 caracteres)")
+                                    else:
+                                        st.write("**Valor:** None ou vazio")
+                                except Exception as e:
+                                    st.write(f"**Erro ao obter valor:** {str(e)}")
+                        elif isinstance(st.secrets, dict):
                             st.write(f"Tipo: dict")
                             st.write(f"Chaves disponíveis: {list(st.secrets.keys())}")
                         else:
-                            st.write(f"Tipo: {type(st.secrets)}")
-                            st.write(f"Atributos: {[attr for attr in dir(st.secrets) if not attr.startswith('_')]}")
+                            st.write(f"Atributos públicos: {[attr for attr in dir(st.secrets) if not attr.startswith('_')]}")
                     except Exception as e:
                         st.write(f"Erro ao inspecionar: {str(e)}")
                 else:
