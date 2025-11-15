@@ -22,32 +22,62 @@ def get_api_key_from_streamlit():
     Prioriza secrets do Streamlit Cloud.
     """
     api_key = None
+    debug_info = []
     
     # Tenta obter dos secrets do Streamlit Cloud primeiro
     try:
         if hasattr(st, 'secrets'):
+            debug_info.append("st.secrets existe")
             # No Streamlit Cloud, os secrets são acessados via st.secrets
             # Pode ser um dict ou um objeto com atributos
             try:
                 # Tenta acessar como atributo (formato mais comum no Streamlit Cloud)
                 api_key = st.secrets.OPENAQ_API_KEY
-            except (AttributeError, KeyError):
+                debug_info.append("Acessado via st.secrets.OPENAQ_API_KEY")
+            except (AttributeError, KeyError) as e:
+                debug_info.append(f"Erro ao acessar como atributo: {type(e).__name__}")
                 try:
                     # Tenta acessar como dict
                     if isinstance(st.secrets, dict):
                         api_key = st.secrets.get('OPENAQ_API_KEY')
+                        debug_info.append("Acessado via st.secrets.get()")
                     else:
                         api_key = st.secrets['OPENAQ_API_KEY']
-                except (KeyError, TypeError):
+                        debug_info.append("Acessado via st.secrets['OPENAQ_API_KEY']")
+                except (KeyError, TypeError) as e:
+                    debug_info.append(f"Erro ao acessar como dict: {type(e).__name__}")
                     # Tenta via get se disponível
                     if hasattr(st.secrets, 'get'):
                         api_key = st.secrets.get('OPENAQ_API_KEY')
-    except Exception:
-        pass
+                        debug_info.append("Acessado via st.secrets.get() (fallback)")
+        else:
+            debug_info.append("st.secrets NÃO existe")
+    except Exception as e:
+        debug_info.append(f"Exceção geral: {str(e)}")
     
     # Se não encontrou nos secrets, tenta variável de ambiente
     if not api_key:
-        api_key = get_api_key()
+        env_key = get_api_key()
+        if env_key:
+            api_key = env_key
+            debug_info.append("Usando variável de ambiente")
+        else:
+            debug_info.append("Nenhuma chave encontrada")
+    
+    # Log de debug (visível nos logs do Streamlit Cloud)
+    if api_key:
+        print(f"✅ API Key encontrada! (Debug: {' | '.join(debug_info)})")
+    else:
+        print(f"❌ API Key NÃO encontrada! (Debug: {' | '.join(debug_info)})")
+        # Tenta listar todos os secrets disponíveis para debug
+        try:
+            if hasattr(st, 'secrets'):
+                if isinstance(st.secrets, dict):
+                    print(f"Secrets disponíveis (dict): {list(st.secrets.keys())}")
+                else:
+                    print(f"Secrets disponíveis (objeto): {dir(st.secrets)}")
+        except:
+            pass
     
     return api_key
 
@@ -80,6 +110,11 @@ with st.sidebar:
     st.subheader("Selecione a Cidade")
     
     if api_key:
+        # Debug: mostra que a chave foi encontrada (apenas no primeiro carregamento)
+        if 'api_key_loaded' not in st.session_state:
+            st.session_state.api_key_loaded = True
+            st.success("✅ Chave de API carregada com sucesso!")
+        
         # Usa cache para evitar recarregar toda vez
         available_cities = get_cached_cities(api_key)
         
@@ -118,7 +153,51 @@ with st.sidebar:
             selected_city = None
     else:
         st.error("❌ Chave de API não configurada!")
-        st.info("Configure a variável de ambiente OPENAQ_API_KEY")
+        st.warning("""
+        **Problema:** A chave de API não foi encontrada.
+        
+        **Verifique:**
+        1. No Streamlit Cloud, vá em **Settings** → **Secrets**
+        2. Certifique-se de que o formato está correto:
+           ```toml
+           [secrets]
+           OPENAQ_API_KEY = "sua_chave_aqui"
+           ```
+        3. Aguarde 1-2 minutos após salvar
+        4. Recarregue a página (F5)
+        
+        **Para ver os logs:**
+        - No Streamlit Cloud, vá em **Manage app** → **Logs**
+        - Os logs mostrarão informações de debug sobre a busca da chave
+        """)
+        
+        # Mostra informações de debug
+        with st.expander("🔍 Informações de Debug"):
+            st.write("**Status dos Secrets:**")
+            try:
+                if hasattr(st, 'secrets'):
+                    st.write("✅ `st.secrets` está disponível")
+                    try:
+                        if isinstance(st.secrets, dict):
+                            st.write(f"Tipo: dict")
+                            st.write(f"Chaves disponíveis: {list(st.secrets.keys())}")
+                        else:
+                            st.write(f"Tipo: {type(st.secrets)}")
+                            st.write(f"Atributos: {[attr for attr in dir(st.secrets) if not attr.startswith('_')]}")
+                    except Exception as e:
+                        st.write(f"Erro ao inspecionar: {str(e)}")
+                else:
+                    st.write("❌ `st.secrets` NÃO está disponível")
+            except Exception as e:
+                st.write(f"Erro: {str(e)}")
+            
+            st.write("\n**Variável de Ambiente:**")
+            env_key = get_api_key()
+            if env_key:
+                st.write(f"✅ Encontrada (primeiros 10 caracteres: {env_key[:10]}...)")
+            else:
+                st.write("❌ Não encontrada")
+        
         selected_city = None
     
     st.markdown("---")

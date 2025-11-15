@@ -51,6 +51,47 @@ O Streamlit Cloud é a forma mais fácil de fazer deploy de aplicativos Streamli
    - Aguarde o build e deploy
    - Seu app estará disponível em: `https://seu-usuario-streamlit-app.streamlit.app`
 
+### 🔍 Ver Logs da Aplicação
+
+Para ver os logs e debug da aplicação no Streamlit Cloud:
+
+1. **Acesse o painel do app:**
+   - Vá para [share.streamlit.io](https://share.streamlit.io)
+   - Faça login e selecione seu app
+
+2. **Acesse os logs:**
+   - Clique no menu "☰" (três linhas) no canto superior direito
+   - Selecione **"Manage app"**
+   - Clique na aba **"Logs"**
+   - Você verá todos os logs da aplicação, incluindo mensagens de debug
+
+3. **O que procurar nos logs:**
+   - Mensagens como `✅ API Key encontrada!` ou `❌ API Key NÃO encontrada!`
+   - Informações sobre como a chave foi acessada
+   - Lista de secrets disponíveis (se a chave não for encontrada)
+
+### ⚠️ Troubleshooting
+
+**Se a chave de API não estiver funcionando:**
+
+1. **Verifique o formato TOML:**
+   - Deve começar com `[secrets]` na primeira linha
+   - Use aspas duplas ao redor do valor
+   - Não use espaços extras
+
+2. **Aguarde a propagação:**
+   - Após salvar os secrets, aguarde 1-2 minutos
+   - Recarregue a página do app (F5)
+
+3. **Faça um redeploy:**
+   - No painel do app, clique em "☰" → "Manage app"
+   - Clique em "Reboot app" para reiniciar
+   - Ou faça um novo commit e push para forçar redeploy
+
+4. **Verifique os logs:**
+   - Use a seção "🔍 Informações de Debug" no app
+   - Ou veja os logs no painel do Streamlit Cloud
+
 ## ☁️ Heroku
 
 ### Passos:
