@@ -38,8 +38,16 @@ st.markdown("---")
 with st.sidebar:
     st.header("⚙️ Configurações")
     
-    # Obtém a chave de API
+    # Obtém a chave de API (tenta variável de ambiente ou secrets do Streamlit)
     api_key = get_api_key()
+    
+    # Se não encontrou, tenta obter dos secrets do Streamlit Cloud
+    if not api_key:
+        try:
+            if hasattr(st, 'secrets') and 'OPENAQ_API_KEY' in st.secrets:
+                api_key = st.secrets['OPENAQ_API_KEY']
+        except:
+            pass
     
     # Busca cidades disponíveis na API
     st.subheader("Selecione a Cidade")

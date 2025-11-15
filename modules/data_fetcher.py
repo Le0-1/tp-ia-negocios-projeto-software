@@ -24,6 +24,7 @@ BASE_URL_LOCATIONS = "https://api.openaq.org/v3/locations"
 def get_api_key() -> Optional[str]:
     """
     Obtém a chave de API das variáveis de ambiente.
+    No Streamlit Cloud, os secrets são automaticamente injetados como variáveis de ambiente.
     
     Returns:
         Chave de API ou None se não estiver configurada.
