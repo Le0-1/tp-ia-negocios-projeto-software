@@ -19,42 +19,61 @@ load_dotenv()
 def get_api_key_from_streamlit():
     """
     Obtém a chave de API do Streamlit Cloud secrets ou variável de ambiente.
-    Prioriza secrets do Streamlit Cloud.
+    Prioriza secrets do Streamlit Cloud e trata diferentes formatos de secrets.
     """
     api_key = None
     debug_info = []
+    
+    def try_extract_from(value, source_label):
+        """Tenta extrair a chave de um dict/objeto."""
+        if not value:
+            return None, f"{source_label}: valor vazio"
+        
+        # Se for dict-like
+        if isinstance(value, dict):
+            if 'OPENAQ_API_KEY' in value:
+                return value.get('OPENAQ_API_KEY'), f"{source_label}: encontrado em dict"
+            return None, f"{source_label}: dict sem OPENAQ_API_KEY"
+        
+        # Se tiver get()
+        if hasattr(value, 'get'):
+            key = value.get('OPENAQ_API_KEY')
+            if key:
+                return key, f"{source_label}: encontrado via get()"
+            return None, f"{source_label}: get() retornou None"
+        
+        # Se tiver atributo direto
+        if hasattr(value, 'OPENAQ_API_KEY'):
+            return getattr(value, 'OPENAQ_API_KEY'), f"{source_label}: encontrado via atributo"
+        
+        return None, f"{source_label}: formato não suportado"
     
     # Tenta obter dos secrets do Streamlit Cloud primeiro
     try:
         if hasattr(st, 'secrets'):
             debug_info.append("st.secrets existe")
             
-            # O objeto Secrets tem métodos: get, has_key, keys, etc.
-            # Primeiro verifica se a chave existe
-            if hasattr(st.secrets, 'has_key') and st.secrets.has_key('OPENAQ_API_KEY'):
-                debug_info.append("Chave encontrada via has_key")
-                api_key = st.secrets.get('OPENAQ_API_KEY')
-                debug_info.append("Acessado via st.secrets.get()")
-            elif hasattr(st.secrets, 'get'):
-                # Tenta usar get diretamente (pode retornar None se não existir)
-                api_key = st.secrets.get('OPENAQ_API_KEY')
-                if api_key:
-                    debug_info.append("Acessado via st.secrets.get() (sucesso)")
-                else:
-                    debug_info.append("st.secrets.get() retornou None")
-            else:
-                # Tenta acessar como atributo
-                try:
-                    api_key = st.secrets.OPENAQ_API_KEY
-                    debug_info.append("Acessado via st.secrets.OPENAQ_API_KEY")
-                except AttributeError:
-                    debug_info.append("Erro ao acessar como atributo")
-                    # Tenta como dict
-                    try:
-                        api_key = st.secrets['OPENAQ_API_KEY']
-                        debug_info.append("Acessado via st.secrets['OPENAQ_API_KEY']")
-                    except (KeyError, TypeError):
-                        debug_info.append("Erro ao acessar como dict")
+            # Tenta extrair diretamente
+            api_key, info = try_extract_from(st.secrets, "st.secrets raiz")
+            debug_info.append(info)
+            
+            # Se não encontrou, verifica se há seção 'secrets' (formato [secrets])
+            if not api_key:
+                nested = None
+                if hasattr(st.secrets, 'has_key') and st.secrets.has_key('secrets'):
+                    nested = st.secrets.get('secrets')
+                    debug_info.append("Encontrado nested 'secrets' via has_key")
+                elif hasattr(st.secrets, 'get'):
+                    nested = st.secrets.get('secrets')
+                    if nested:
+                        debug_info.append("Encontrado nested 'secrets' via get()")
+                elif isinstance(st.secrets, dict) and 'secrets' in st.secrets:
+                    nested = st.secrets['secrets']
+                    debug_info.append("Encontrado nested 'secrets' via dict")
+                
+                if nested:
+                    api_key, info = try_extract_from(nested, "seção [secrets]")
+                    debug_info.append(info)
         else:
             debug_info.append("st.secrets NÃO existe")
     except Exception as e:
@@ -78,11 +97,12 @@ def get_api_key_from_streamlit():
         try:
             if hasattr(st, 'secrets'):
                 if hasattr(st.secrets, 'keys'):
-                    try:
-                        keys_list = list(st.secrets.keys())
-                        print(f"Secrets disponíveis: {keys_list}")
-                    except:
-                        print("Não foi possível listar as chaves dos secrets")
+                    keys_list = list(st.secrets.keys())
+                    print(f"Secrets disponíveis (top-level): {keys_list}")
+                    if 'secrets' in keys_list:
+                        nested = st.secrets.get('secrets')
+                        if isinstance(nested, dict):
+                            print(f"Secrets dentro de [secrets]: {list(nested.keys())}")
                 elif isinstance(st.secrets, dict):
                     print(f"Secrets disponíveis (dict): {list(st.secrets.keys())}")
         except Exception as e:
@@ -192,23 +212,29 @@ with st.sidebar:
                     try:
                         if hasattr(st.secrets, 'keys'):
                             keys_list = list(st.secrets.keys())
-                            st.write(f"**Chaves disponíveis:** {keys_list}")
+                            st.write(f"**Chaves disponíveis (top-level):** {keys_list}")
                             
-                            # Verifica especificamente se OPENAQ_API_KEY existe
+                            # Verifica especificamente se OPENAQ_API_KEY existe no topo
+                            has_key = False
                             if hasattr(st.secrets, 'has_key'):
                                 has_key = st.secrets.has_key('OPENAQ_API_KEY')
-                                st.write(f"**OPENAQ_API_KEY existe?** {'✅ Sim' if has_key else '❌ Não'}")
+                                st.write(f"**OPENAQ_API_KEY (top-level) existe?** {'✅ Sim' if has_key else '❌ Não'}")
                             
-                            # Tenta obter o valor
-                            if 'OPENAQ_API_KEY' in keys_list:
-                                try:
-                                    key_value = st.secrets.get('OPENAQ_API_KEY')
-                                    if key_value:
-                                        st.write(f"**Valor encontrado:** {key_value[:10]}... (primeiros 10 caracteres)")
+                            # Se não existe no topo, verifica se há seção [secrets]
+                            if not has_key and 'secrets' in keys_list:
+                                nested = st.secrets.get('secrets')
+                                if nested:
+                                    if isinstance(nested, dict):
+                                        nested_keys = list(nested.keys())
+                                        st.write(f"**Chaves dentro de [secrets]:** {nested_keys}")
+                                        if 'OPENAQ_API_KEY' in nested_keys:
+                                            val = nested.get('OPENAQ_API_KEY')
+                                            if val:
+                                                st.write(f"**Valor dentro de [secrets]:** {val[:10]}...")
+                                            else:
+                                                st.write("**Valor dentro de [secrets]:** vazio")
                                     else:
-                                        st.write("**Valor:** None ou vazio")
-                                except Exception as e:
-                                    st.write(f"**Erro ao obter valor:** {str(e)}")
+                                        st.write(f"Formato inesperado dentro de [secrets]: {type(nested)}")
                         elif isinstance(st.secrets, dict):
                             st.write(f"Tipo: dict")
                             st.write(f"Chaves disponíveis: {list(st.secrets.keys())}")

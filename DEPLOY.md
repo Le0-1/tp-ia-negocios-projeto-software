@@ -33,14 +33,18 @@ O Streamlit Cloud é a forma mais fácil de fazer deploy de aplicativos Streamli
 
 4. **Configure a variável de ambiente:**
    - No painel do app, vá em "Settings" → "Secrets"
-   - Adicione no formato TOML (use aspas duplas e a seção [secrets]):
+   - **Formato recomendado (mais simples):**
+     ```toml
+     OPENAQ_API_KEY = "3125f0d41afec0ee8b1871165638fa7352734cd8e2afe085f54a446d7092f864"
+     ```
+   - **Se preferir usar uma seção `[secrets]`:**
      ```toml
      [secrets]
      OPENAQ_API_KEY = "3125f0d41afec0ee8b1871165638fa7352734cd8e2afe085f54a446d7092f864"
      ```
+     O código já trata ambos os formatos.
    - **Importante:** 
      - O Streamlit Cloud requer formato TOML válido
-     - Use `[secrets]` na primeira linha
      - Use aspas duplas ao redor do valor
      - Não use espaços antes ou depois do `=`
      - Após salvar, aguarde 1-2 minutos para as mudanças propagarem
